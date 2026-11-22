@@ -202,8 +202,25 @@ def test_block_after_five_failed_logins(client):
 
 def test_db_schema_matches_dictionary(client):
     """Встроенный просмотрщик БД: все таблицы словаря на месте,
-    у users — ключ user_id, всего 15 таблиц (11 авторизации + 4 магазина)."""
+    у users — ключ user_id, всего 15 таблиц (11 авторизации + 4 магазина).
+    Схема доступна только администраторам."""
+    r = client.post("/api/auth/login", json={
+        "email": "admin@onlain-treid.ru", "password": "Admin1234",
+    })
+    assert r.status_code == 200, r.text
+    headers = _auth_headers(r.json()["access_token"])
+
+    # Обычный покупатель — 403, гость — 401.
+    r = client.post("/api/auth/login", json={
+        "email": "demo@onlain-treid.ru", "password": "Demo1234",
+    })
+    demo_headers = _auth_headers(r.json()["access_token"])
+    r = client.get("/api/db/schema", headers=demo_headers)
+    assert r.status_code == 403
     r = client.get("/api/db/schema")
+    assert r.status_code == 401
+
+    r = client.get("/api/db/schema", headers=headers)
     assert r.status_code == 200, r.text
     tables = {t["name"]: t for t in r.json()["tables"]}
     assert len(tables) == 15
@@ -220,8 +237,96 @@ def test_db_schema_matches_dictionary(client):
     assert "salt" not in cols
     assert "failed_login_attempts" in cols
     assert "is_blocked" in cols
-    assert users["rows"] >= 1  # демо-аккаунт засеян при старте
+    assert users["rows"] >= 2  # демо-аккаунт и администратор засеяны
     sessions = tables["sessions"]
     scols = {c["name"] for c in sessions["columns"]}
     assert "token_hash" not in scols  # токен — это session_id
     assert "is_revoked" in scols
+
+
+def test_admin_orders_flow(client):
+    """Админка заказов: демо-покупатель оформляет заказ,
+    администратор видит его и меняет статус; покупатель — 403,
+    неверный статус — 422."""
+    # Заказ от демо-покупателя.
+    r = client.post("/api/auth/login", json={
+        "email": "demo@onlain-treid.ru", "password": "Demo1234",
+    })
+    demo_headers = _auth_headers(r.json()["access_token"])
+    client.post("/api/cart", json={"product_id": HEADPHONES_ID, "qty": 1},
+                headers=demo_headers)
+    r = client.post("/api/orders", json={
+        "name": "Иван Петров",
+        "phone": "+7 999 123-45-67",
+        "address": "г. Тюмень, ул. Ленина, д. 10, кв. 25",
+        "pay_method": "card_online",
+    }, headers=demo_headers)
+    assert r.status_code == 201, r.text
+    order_id = r.json()["id"]
+
+    # Администратор: вход и список всех заказов.
+    r = client.post("/api/auth/login", json={
+        "email": "admin@onlain-treid.ru", "password": "Admin1234",
+    })
+    assert r.status_code == 200, r.text
+    admin_headers = _auth_headers(r.json()["access_token"])
+    r = client.get("/api/admin/orders", headers=admin_headers)
+    assert r.status_code == 200, r.text
+    orders = r.json()
+    assert len(orders) == 1
+    assert orders[0]["order_number"] == 1001
+    assert orders[0]["user_email"] == "demo@onlain-treid.ru"
+
+    # Смена статуса: принять заказ.
+    r = client.patch(f"/api/admin/orders/{order_id}",
+                     json={"status": "Подтверждён"},
+                     headers=admin_headers)
+    assert r.status_code == 200, r.text
+    assert r.json()["status"] == "Подтверждён"
+
+    # Неверный статус — 422.
+    r = client.patch(f"/api/admin/orders/{order_id}",
+                     json={"status": "Летит"},
+                     headers=admin_headers)
+    assert r.status_code == 422
+
+    # Несуществующий заказ — 404.
+    r = client.patch("/api/admin/orders/9999",
+                     json={"status": "Отменён"},
+                     headers=admin_headers)
+    assert r.status_code == 404
+
+    # Обычный покупатель — 403, гость — 401.
+    r = client.get("/api/admin/orders", headers=demo_headers)
+    assert r.status_code == 403
+    r = client.get("/api/admin/orders")
+    assert r.status_code == 401
+
+
+def test_sqladmin_login(client):
+    """Панель /admin (SQLAdmin): без входа — редирект на страницу
+    входа; вход администратором открывает список моделей."""
+    r = client.get("/admin/", follow_redirects=False)
+    assert r.status_code in (302, 307)
+    assert "/admin/login" in r.headers["location"]
+
+    r = client.get("/admin/login")
+    assert r.status_code == 200
+
+    r = client.post("/admin/login",
+                    data={"username": "admin@onlain-treid.ru",
+                          "password": "Admin1234"},
+                    follow_redirects=False)
+    assert r.status_code in (302, 303), r.text
+    assert "/admin" in r.headers["location"]
+
+    r = client.get("/admin/")
+    assert r.status_code == 200
+    assert "users" in r.text.lower() or "Пользователи" in r.text
+
+    # Неверный пароль — 400, страница входа с ошибкой (без редиректа).
+    r = client.post("/admin/login",
+                    data={"username": "admin@onlain-treid.ru",
+                          "password": "WrongPass1"},
+                    follow_redirects=False)
+    assert r.status_code == 400

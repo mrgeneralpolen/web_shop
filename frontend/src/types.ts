@@ -80,6 +80,27 @@ export interface DbSchema {
   tables: DbTable[];
 }
 
+export interface AdminOrder extends Order {
+  user_email: string | null;
+}
+
+export const ORDER_STATUSES = [
+  "Принят в обработку",
+  "Подтверждён",
+  "Отправлен",
+  "Завершён",
+  "Отменён",
+] as const;
+
+/** Кнопки смены статуса, доступные из текущего статуса заказа. */
+export const ORDER_NEXT_STATUSES: Record<string, string[]> = {
+  "Принят в обработку": ["Подтверждён", "Отменён"],
+  "Подтверждён": ["Отправлен", "Отменён"],
+  "Отправлен": ["Завершён"],
+  "Завершён": [],
+  "Отменён": [],
+};
+
 export type PayMethod = "card_online" | "card_on_delivery" | "cash";
 
 export const PAY_METHOD_LABELS: Record<PayMethod, string> = {

@@ -250,7 +250,24 @@ VALUES (
 )
 ON CONFLICT (email) DO NOTHING;
 
+-- Аккаунт администратора: admin@onlain-treid.ru / Admin1234
+INSERT INTO users (email, password_hash, full_name, is_active,
+                   two_factor_enabled)
+VALUES (
+    'admin@onlain-treid.ru',
+    'a1b2c3d4e5f60718293a4b5c6d7e8f90$89c7633f5432ed78b86d5c8d7c5656579790534c286a61ea840c449f4db0736c',
+    'Анна Соколова',
+    TRUE,
+    FALSE
+)
+ON CONFLICT (email) DO NOTHING;
+
 INSERT INTO user_roles (user_id, role_id)
 SELECT u.user_id, r.role_id FROM users u, roles r
 WHERE u.email = 'demo@onlain-treid.ru' AND r.role_name = 'user'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO user_roles (user_id, role_id)
+SELECT u.user_id, r.role_id FROM users u, roles r
+WHERE u.email = 'admin@onlain-treid.ru' AND r.role_name IN ('admin', 'user')
 ON CONFLICT DO NOTHING;

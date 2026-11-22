@@ -5,6 +5,7 @@
  */
 
 import type {
+  AdminOrder,
   Cart,
   DbSchema,
   Order,
@@ -221,9 +222,25 @@ export async function getOrders(): Promise<Order[]> {
   return request<Order[]>("/api/orders");
 }
 
-/** Схема базы данных для встроенного просмотрщика. */
+/** Схема базы данных для встроенного просмотрщика (только admin). */
 export async function getDbSchema(): Promise<DbSchema> {
   return request<DbSchema>("/api/db/schema");
+}
+
+/** Все заказы магазина (только admin). */
+export async function getAdminOrders(): Promise<AdminOrder[]> {
+  return request<AdminOrder[]>("/api/admin/orders");
+}
+
+/** Сменить статус заказа (только admin). */
+export async function setOrderStatus(
+  orderId: number,
+  status: string,
+): Promise<AdminOrder> {
+  return request<AdminOrder>(`/api/admin/orders/${orderId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
+  });
 }
 
 /** Корзина гостя: хранится в localStorage до входа, потом переносится

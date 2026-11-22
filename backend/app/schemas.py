@@ -225,3 +225,26 @@ class OrderOut(BaseModel):
     items: list[OrderItemOut]
 
     model_config = {"from_attributes": True}
+
+
+# Статусы заказа для админки.
+ORDER_STATUSES = ("Принят в обработку", "Подтверждён", "Отправлен",
+                  "Завершён", "Отменён")
+
+
+class OrderStatusUpdate(BaseModel):
+    status: str
+
+    @field_validator("status")
+    @classmethod
+    def status_valid(cls, v: str) -> str:
+        if v not in ORDER_STATUSES:
+            raise ValueError(
+                "Недопустимый статус заказа: " + ", ".join(ORDER_STATUSES))
+        return v
+
+
+class AdminOrderOut(OrderOut):
+    """Заказ для админки: плюс покупатель (email учётной записи)."""
+
+    user_email: str | None = None

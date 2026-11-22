@@ -1,6 +1,7 @@
 """Начальные данные: каталог из 12 товаров, роли, права, демо-аккаунт.
 
 Демо-аккаунт: demo@onlain-treid.ru / Demo1234.
+Аккаунт администратора: admin@onlain-treid.ru / Admin1234.
 В базе хранится только хеш пароля ("salt_hex$hash_hex").
 """
 
@@ -16,6 +17,10 @@ except ModuleNotFoundError as _exc:
 DEMO_EMAIL = "demo@onlain-treid.ru"
 DEMO_NAME = "Иван Петров"
 DEMO_PASSWORD = "Demo1234"
+
+ADMIN_EMAIL = "admin@onlain-treid.ru"
+ADMIN_NAME = "Анна Соколова"
+ADMIN_PASSWORD = "Admin1234"
 
 ROLES = {
     "admin": "Администратор магазина",
@@ -326,4 +331,17 @@ def seed(db):
         user_role = roles["user"]
         if user_role not in demo.roles:
             demo.roles.append(user_role)
+        db.commit()
+
+    admin = db.query(models.User).filter_by(email=ADMIN_EMAIL).first()
+    if admin is None:
+        password_hash = hash_password(ADMIN_PASSWORD)
+        admin = models.User(email=ADMIN_EMAIL, password_hash=password_hash,
+                            full_name=ADMIN_NAME, is_active=True)
+        db.add(admin)
+        db.commit()
+        for role_name in ("admin", "user"):
+            role = roles[role_name]
+            if role not in admin.roles:
+                admin.roles.append(role)
         db.commit()

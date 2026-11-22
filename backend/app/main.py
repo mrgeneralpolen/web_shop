@@ -16,6 +16,10 @@
   DELETE /api/cart                 — очистить корзину
   POST   /api/orders               — оформить заказ
   GET    /api/orders               — история заказов
+  GET    /api/admin/orders         — все заказы (только admin)
+  PATCH  /api/admin/orders/{id}    — сменить статус заказа (только admin)
+  GET    /api/db/schema            — схема базы данных (только admin)
+  GET    /admin                    — панель управления данными (SQLAdmin)
 
 Доставка бесплатна при сумме товаров от 5 000 ₽, иначе 399 ₽.
 Номер первого заказа — 1001.
@@ -40,6 +44,7 @@ try:
         ERR_WRONG_PASSWORD,
     )
     from app.seed import seed
+    from app.admin import setup_admin
 except ModuleNotFoundError as _exc:
     # Плоская раскладка (например, Railway/Docker: файлы пакета app
     # скопированы прямо в корень /app, пакета app нет) — импортируем
@@ -57,10 +62,21 @@ except ModuleNotFoundError as _exc:
         ERR_WRONG_PASSWORD,
     )
     from seed import seed
+    from admin import setup_admin
 
 FREE_DELIVERY_FROM = 5000
 DELIVERY_COST = 399
 FIRST_ORDER_NUMBER = 1001
+
+
+def get_current_admin(
+    current_user: models.User = Depends(get_current_user),
+) -> models.User:
+    """Зависимость: только пользователи с ролью admin."""
+    if "admin" not in [r.role_name for r in current_user.roles]:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                            detail="Доступно только администраторам.")
+    return current_user
 
 
 @asynccontextmanager
@@ -102,11 +118,13 @@ def health():
 
 
 @app.get("/api/db/schema")
-def db_schema(db: Session = Depends(get_db)):
+def db_schema(admin: models.User = Depends(get_current_admin),
+              db: Session = Depends(get_db)):
     """Схема базы данных для встроенного просмотрщика (как в DBeaver):
     таблицы, столбцы с типами и связями, число строк. Строится из
     SQLAlchemy-моделей, поэтому всегда соответствует реальной базе.
-    Хеши и секреты в ответ не попадают — только структура."""
+    Хеши и секреты в ответ не попадают — только структура.
+    Доступ — только у администраторов."""
     from sqlalchemy import func
 
     tables = []
@@ -503,6 +521,55 @@ def list_orders(current_user: models.User = Depends(get_current_user),
 
 
 # ---------------------------------------------------------------------
+# Админка: заказы (только роль admin)
+# ---------------------------------------------------------------------
+def _admin_order_out(order: models.Order) -> schemas.AdminOrderOut:
+    out = _order_out(order)
+    return schemas.AdminOrderOut(**out.model_dump(), user_email=None)
+
+
+@app.get("/api/admin/orders", response_model=list[schemas.AdminOrderOut])
+def admin_list_orders(admin: models.User = Depends(get_current_admin),
+                      db: Session = Depends(get_db)):
+    """Все заказы магазина (для админки)."""
+    orders = (db.query(models.Order)
+              .order_by(models.Order.created_at.desc())
+              .all())
+    result = []
+    for order in orders:
+        out = _admin_order_out(order)
+        buyer = db.query(models.User).filter_by(
+            user_id=order.user_id).first()
+        out.user_email = buyer.email if buyer else None
+        result.append(out)
+    return result
+
+
+@app.patch("/api/admin/orders/{order_id}",
+           response_model=schemas.AdminOrderOut)
+def admin_set_order_status(order_id: int, data: schemas.OrderStatusUpdate,
+                           request: Request,
+                           admin: models.User = Depends(get_current_admin),
+                           db: Session = Depends(get_db)):
+    """Сменить статус заказа (принять, отправить, завершить, отменить)."""
+    order = db.query(models.Order).filter_by(id=order_id).first()
+    if order is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail="Заказ не найден.")
+    old_status = order.status
+    order.status = data.status
+    db.commit()
+    db.refresh(order)
+    log_audit(db, admin.user_id, "order_status", "success",
+              f"Заказ № {order.order_number}: {old_status} → {data.status}",
+              _client_ip(request))
+    out = _admin_order_out(order)
+    buyer = db.query(models.User).filter_by(user_id=order.user_id).first()
+    out.user_email = buyer.email if buyer else None
+    return out
+
+
+# ---------------------------------------------------------------------
 # Фронтенд: один сервис — один адрес.
 # Собранный React (dist) раздаётся с того же адреса, что и API,
 # поэтому магазин открывается сразу по корню сайта, а запросы /api/*
@@ -532,5 +599,10 @@ def _mount_frontend() -> str | None:
             return str(dist)
     return None
 
+
+# Панель управления данными (SQLAdmin) — /admin. Подключается до
+# монтирования фронтенда, чтобы маршруты /admin не перехватывались
+# раздачей статики.
+setup_admin(app)
 
 FRONTEND_DIST = _mount_frontend()

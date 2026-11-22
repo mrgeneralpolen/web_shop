@@ -10,6 +10,7 @@ import {
   removeFromCart as apiRemoveFromCart,
   saveGuestCart,
 } from "./api";
+import AdminPanel from "./components/AdminPanel";
 import AuthForms from "./components/AuthForms";
 import CartView from "./components/Cart";
 import Catalog from "./components/Catalog";
@@ -27,7 +28,8 @@ type View =
   | "register"
   | "profile"
   | "order-success"
-  | "database";
+  | "database"
+  | "admin";
 
 const EMPTY_CART: Cart = { items: [], goods: 0, delivery: 0, total: 0 };
 
@@ -285,17 +287,31 @@ export default function App() {
               {cartCount() > 0 && <span className="cart-badge">{cartCount()}</span>}
             </button>
             {loggedIn && user ? (
-              <button
-                className={`icon-btn ${view === "profile" ? "active" : ""}`}
-                onClick={() => setView("profile")}
-                aria-label="Личный кабинет"
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-                  <circle cx="12" cy="8" r="4" />
-                  <path d="M4 21c1.5-3.5 4.5-5 8-5s6.5 1.5 8 5" />
-                </svg>
-                {user.name ?? "Кабинет"}
-              </button>
+              <>
+                {user.roles.includes("admin") && (
+                  <button
+                    className={`icon-btn ${view === "admin" ? "active" : ""}`}
+                    onClick={() => setView("admin")}
+                    aria-label="Админка"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                      <path d="M12 2l2.4 4.9 5.4.8-3.9 3.8.9 5.4-4.8-2.5-4.8 2.5.9-5.4L4.2 7.7l5.4-.8L12 2z" />
+                    </svg>
+                    Админка
+                  </button>
+                )}
+                <button
+                  className={`icon-btn ${view === "profile" ? "active" : ""}`}
+                  onClick={() => setView("profile")}
+                  aria-label="Личный кабинет"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                    <circle cx="12" cy="8" r="4" />
+                    <path d="M4 21c1.5-3.5 4.5-5 8-5s6.5 1.5 8 5" />
+                  </svg>
+                  {user.name ?? "Кабинет"}
+                </button>
+              </>
             ) : (
               <button
                 className={`icon-btn ${view === "login" ? "active" : ""}`}
@@ -475,7 +491,16 @@ export default function App() {
               </div>
             </div>
           )}
-          {view === "database" && <DbViewer onBack={goCatalog} />}
+          {view === "database" && (
+            <DbViewer onBack={() => setView("admin")} />
+          )}
+
+          {view === "admin" && (
+            <AdminPanel
+              onBack={goCatalog}
+              onGoDb={() => setView("database")}
+            />
+          )}
         </div>
       </main>
 
@@ -492,14 +517,6 @@ export default function App() {
           <div>
             <h3>Онлайн-Трейд</h3>
             <p>Интернет-магазин электроники и товаров для дома.</p>
-          </div>
-          <div>
-            <button
-              className="footer-link"
-              onClick={() => setView("database")}
-            >
-              Схема базы данных
-            </button>
           </div>
         </div>
       </footer>

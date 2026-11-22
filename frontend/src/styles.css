@@ -1142,3 +1142,87 @@ a {
     flex-wrap: wrap;
   }
 }
+
+/* ------------------------- Админка ------------------------- */
+.admin-panel {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.admin-links {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.admin-order {
+  border: 1px solid #e3e3e3;
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 16px;
+  background: #fff;
+}
+
+.admin-order-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.admin-order-date {
+  color: #666;
+  font-size: 14px;
+}
+
+.admin-order-addr {
+  color: #555;
+}
+
+.admin-order-items {
+  margin: 8px 0;
+  padding-left: 18px;
+  color: #333;
+}
+
+.admin-order-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.status-pill {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.status-new {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.status-confirmed {
+  background: #d6e9ff;
+  color: #0b5ed7;
+}
+
+.status-shipped {
+  background: #e0d4f7;
+  color: #5b21b6;
+}
+
+.status-done {
+  background: #d4edda;
+  color: #155724;
+}
+
+.status-cancelled {
+  background: #f8d7da;
+  color: #721c24;
+}

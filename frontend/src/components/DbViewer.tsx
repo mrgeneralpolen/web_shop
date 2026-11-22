@@ -113,11 +113,6 @@ export default function DbViewer({ onBack }: Props) {
         <span>База данных</span>
       </div>
       <h1>База данных</h1>
-      <p className="sub">
-        Структура базы данных магазина: таблицы модуля авторизации и таблицы
-        магазина. Схема строится из моделей бэкенда и всегда соответствует
-        реальной базе.
-      </p>
 
       {error && <div className="form-error">{error}</div>}
       {!schema && !error && <p>Загрузка схемы…</p>}
