@@ -95,8 +95,8 @@ app.add_middleware(
 # ---------------------------------------------------------------------
 # Служебное
 # ---------------------------------------------------------------------
-@app.get("/")
-def root():
+@app.get("/api/health")
+def health():
     """Проверка, что сервис жив (для Railway и быстрой проверки)."""
     return {"status": "ok", "service": "onlain-treid"}
 
@@ -500,3 +500,37 @@ def list_orders(current_user: models.User = Depends(get_current_user),
               .order_by(models.Order.created_at.desc())
               .all())
     return [_order_out(o) for o in orders]
+
+
+# ---------------------------------------------------------------------
+# Фронтенд: один сервис — один адрес.
+# Собранный React (dist) раздаётся с того же адреса, что и API,
+# поэтому магазин открывается сразу по корню сайта, а запросы /api/*
+# идут на тот же origin (CORS не нужен). Если папки со сборкой нет
+# (локальная разработка бэкенда), монтирование просто пропускается.
+# ---------------------------------------------------------------------
+def _mount_frontend() -> str | None:
+    import os
+    from pathlib import Path
+
+    from fastapi.staticfiles import StaticFiles
+
+    here = Path(__file__).resolve().parent
+    candidates = [
+        os.environ.get("FRONTEND_DIST"),
+        "/app/static",
+        str(here.parent / "static"),
+        str(here.parent.parent / "frontend" / "dist"),
+    ]
+    for candidate in candidates:
+        if not candidate:
+            continue
+        dist = Path(candidate)
+        if dist.is_dir() and (dist / "index.html").is_file():
+            app.mount("/", StaticFiles(directory=str(dist), html=True),
+                      name="frontend")
+            return str(dist)
+    return None
+
+
+FRONTEND_DIST = _mount_frontend()

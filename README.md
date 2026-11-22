@@ -93,13 +93,14 @@ uvicorn app.main:app --reload    # http://localhost:8000
 файл базы живёт рядом с бэкендом; для постоянного хранения подключи Volume
 или PostgreSQL (см. `db/schema_postgres.sql`).
 
-**Прод на Railway:** бэкенд — `https://web-shop-production-3ef6c47a.up.railway.app`
-(проверка: открыть `https://web-shop-production-3ef6c47a.up.railway.app/` —
-должен ответить `{"status":"ok",...}`). После деплоя этой версии фронт
-собирается с переменной `VITE_API_URL=https://web-shop-production-3ef6c47a.up.railway.app`,
-а на сервисе бэкенда в Railway ставится `CORS_ORIGINS` — адрес, где лежит
-фронт (например, его домен `https://....up.railway.app`). Без `CORS_ORIGINS`
-браузер заблокирует запросы с продакшн-фронта.
+**Прод на Railway — один сервис, один адрес.** Dockerfile в корне
+репозитория собирает фронт и бэкенд в один образ: бэкенд раздаёт и API,
+и собранный фронт с того же адреса. Деплой: один сервис из репозитория,
+Dockerfile определяется сам. Открыл ссылку сервиса — и сразу магазин.
+Проверка, что сервис жив: `https://<домен>/api/health` —
+должен ответить `{"status":"ok",...}`. `CORS_ORIGINS` больше не нужен:
+фронт и API на одном origin. Живой адрес бэкенда сейчас:
+`https://webshop-production-6dbd19ff.up.railway.app`.
 
 ## Запуск фронтенда
 
