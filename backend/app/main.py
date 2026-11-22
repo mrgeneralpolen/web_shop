@@ -31,6 +31,7 @@ from datetime import timedelta
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
 try:
@@ -598,6 +599,18 @@ def _mount_frontend() -> str | None:
                       name="frontend")
             return str(dist)
     return None
+
+
+@app.get("/admin", include_in_schema=False)
+def admin_root():
+    """«/admin» без завершающего слеша — редирект на «/admin/».
+
+    Без этого запрос перехватывает раздача статики фронтенда
+    (монт «/»): файла admin в dist нет, и бэкенд отдаёт
+    {"detail":"Not Found"}. Маршрут стоит до монтирования
+    фронтенда, поэтому срабатывает первым.
+    """
+    return RedirectResponse(url="/admin/", status_code=307)
 
 
 # Панель управления данными (SQLAdmin) — /admin. Подключается до
